@@ -1,5 +1,31 @@
   var fetchTextFromURL;
-  if (typeof XMLHttpRequest != 'undefined') {
+  if (typeof fetch != 'undefined') {
+    fetchTextFromURL = function(url, authorization, fulfill, reject) {
+      var opts = {
+        headers: {'Accept': 'application/x-es-module, */*'}
+      };
+
+      if(authorization) {
+        if(typeof authorization == 'string')
+          opts.headers['Authorization'] = authorization;
+        opts.credentials = 'include';
+      }
+
+      fetch(url, opts)
+        .then(function (r) {
+          if(r.ok) {
+            return r.text();
+          } else {
+            throw new Error('Fetch error: ' + r.status + ' ' + r.statusText);
+          }
+        })
+        .then(function (r) {
+          fulfill(r);
+        }).catch(function (err) {
+          reject(err);
+        });
+    }
+  } else if (typeof XMLHttpRequest != 'undefined') {
     fetchTextFromURL = function(url, authorization, fulfill, reject) {
       var xhr = new XMLHttpRequest();
       var sameDomain = true;
