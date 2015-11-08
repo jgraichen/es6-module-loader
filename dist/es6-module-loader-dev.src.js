@@ -903,19 +903,14 @@ function logloads(loads) {
       if (typeof obj != 'object')
         throw new TypeError('Expected object');
 
-      // we do this to be able to tell if a module is a module privately in ES5
-      // by doing m instanceof Module
       var m = new Module();
 
-      var pNames;
-      if (Object.getOwnPropertyNames && obj != null) {
+      var pNames = [];
+      if (Object.getOwnPropertyNames && obj != null)
         pNames = Object.getOwnPropertyNames(obj);
-      }
-      else {
-        pNames = [];
+      else
         for (var key in obj)
           pNames.push(key);
-      }
 
       for (var i = 0; i < pNames.length; i++) (function(key) {
         defineProperty(m, key, {
@@ -926,9 +921,6 @@ function logloads(loads) {
           }
         });
       })(pNames[i]);
-
-      if (Object.preventExtensions)
-        Object.preventExtensions(m);
 
       return m;
     },
@@ -1369,7 +1361,7 @@ function SystemLoader() {
 // NB no specification provided for System.paths, used ideas discussed in https://github.com/jorendorff/js-loaders/issues/25
 function applyPaths(paths, name) {
   // most specific (most number of slashes in path) match wins
-  var pathMatch = '', wildcard, maxSlashCount = 0;
+  var pathMatch = '', wildcard, maxWildcardPrefixLen = 0;
 
   // check to see if we have a paths entry
   for (var p in paths) {
@@ -1386,11 +1378,11 @@ function applyPaths(paths, name) {
     }
     // wildcard path match
     else {
-      var slashCount = p.split('/').length;
-      if (slashCount >= maxSlashCount &&
+      var wildcardPrefixLen = pathParts[0].length;
+      if (wildcardPrefixLen >= maxWildcardPrefixLen &&
           name.substr(0, pathParts[0].length) == pathParts[0] &&
           name.substr(name.length - pathParts[1].length) == pathParts[1]) {
-            maxSlashCount = slashCount;
+            maxWildcardPrefixLen = wildcardPrefixLen;
             pathMatch = p;
             wildcard = name.substr(pathParts[0].length, name.length - pathParts[1].length - pathParts[0].length);
           }
@@ -1455,7 +1447,33 @@ SystemLoader.prototype.instantiate = function(load) {
   });
 };
   var fetchTextFromURL;
-  if (typeof XMLHttpRequest != 'undefined') {
+  if (typeof fetch != 'undefined') {
+    fetchTextFromURL = function(url, authorization, fulfill, reject) {
+      var opts = {
+        headers: {'Accept': 'application/x-es-module, */*'}
+      };
+
+      if(authorization) {
+        if(typeof authorization == 'string')
+          opts.headers['Authorization'] = authorization;
+        opts.credentials = 'include';
+      }
+
+      fetch(url, opts)
+        .then(function (r) {
+          if(r.ok) {
+            return r.text();
+          } else {
+            throw new Error('Fetch error: ' + r.status + ' ' + r.statusText);
+          }
+        })
+        .then(function (r) {
+          fulfill(r);
+        }).catch(function (err) {
+          reject(err);
+        });
+    }
+  } else if (typeof XMLHttpRequest != 'undefined') {
     fetchTextFromURL = function(url, authorization, fulfill, reject) {
       var xhr = new XMLHttpRequest();
       var sameDomain = true;
